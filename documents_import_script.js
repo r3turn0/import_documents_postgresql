@@ -19,12 +19,22 @@ const client = new Client({
 async function importDocuments(file) {
     const firstName = process.env.UPLOADED_BY.split(' ')[0];
     const lastName = process.env.UPLOADED_BY.split(' ')[1];
-    console.log('Uploading by', firstName, lastName);
+    console.log('Uploading file:', file, 'by',firstName, lastName);
     const getUserQuery = `SELECT uid FROM etc.users WHERE first_name LIKE $1 AND last_name LIKE $2`;
     const resultUser = await client.query(getUserQuery, [firstName, lastName]);
     console.log('User: ', resultUser);
-    const query = `INSERT INTO etc.documents (filename, date_upload, uid, uploaded_by, filepath) VALUES ($1, $2, $3, $4, $5)`;
-    const values = [file, new Date().toISOString(), resultUser.rows[0].uid, process.env.UPLOADED_BY, directoryPath + '/' + file];
+    const getFileQuery = `SELECT load_id, date_upload FROM etc.products WHERE filename LIKE '%' || $1 || '%'`;
+    const resultFile = await client.query(getFileQuery, [file]);
+    if (resultFile.rows.length === 0) {
+        console.log('No file found in the database matching:', file);
+        return;
+    }
+    const load_id = resultFile.rows[0].load_id;
+    const date_upload = resultFile.rows[0].date_upload;
+    console.log('Load ID: ', load_id);
+    const query = `INSERT INTO etc.documents (filename, date_upload, uid, uploaded_by, filepath, load_id) 
+                    VALUES ($1, $2, $3, $4, $5, $6)`;
+    const values = [file, date_upload, resultUser.rows[0].uid, process.env.UPLOADED_BY, directoryPath + '/' + file, load_id];
     const results = await client.query(query, values);
     console.log('Row inserted: ', results);
 }
